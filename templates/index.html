@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CardiXAI — Heart Risk Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:        #060b14;
+      --surface:   #0d1526;
+      --card:      #111c30;
+      --border:    #1e3050;
+      --accent:    #00e5ff;
+      --accent2:   #ff3d71;
+      --green:     #00f5a0;
+      --amber:     #ffb547;
+      --text:      #e2eeff;
+      --muted:     #5a7aa8;
+      --mono:      'Space Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin:0; padding:0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Grid noise overlay ── */
+    body::before {
+      content:'';
+      position:fixed; inset:0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events:none; z-index:0;
+    }
+
+    /* ── Radial glow ── */
+    .glow-orb {
+      position:fixed; border-radius:50%;
+      filter: blur(120px); pointer-events:none; z-index:0;
+    }
+    .glow-orb.one { width:500px;height:500px;top:-150px;left:-100px;
+      background:radial-gradient(circle, rgba(0,229,255,0.08), transparent 70%); }
+    .glow-orb.two { width:400px;height:400px;bottom:-100px;right:-50px;
+      background:radial-gradient(circle, rgba(255,61,113,0.07), transparent 70%); }
+
+    /* ── Layout ── */
+    .wrapper { position:relative; z-index:1; max-width:1080px; margin:0 auto; padding:0 24px 80px; }
+
+    /* ── Header ── */
+    header {
+      padding: 40px 0 32px;
+      display:flex; align-items:center; gap:16px;
+    }
+    .logo-icon {
+      width:44px; height:44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius:12px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:20px;
+    }
+    .logo-text {
+      font-family: var(--mono);
+      font-size:22px; font-weight:700;
+      letter-spacing:-0.5px;
+      background: linear-gradient(90deg, var(--accent), #80eaff);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    }
+    .logo-sub { font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; }
+    .badge {
+      margin-left:auto;
+      font-family:var(--mono); font-size:10px;
+      background: rgba(0,229,255,0.08);
+      border: 1px solid rgba(0,229,255,0.2);
+      color:var(--accent);
+      padding:4px 10px; border-radius:20px;
+      letter-spacing:1px;
+    }
+
+    /* ── Tagline ── */
+    .tagline {
+      text-align:center;
+      padding: 0 0 48px;
+    }
+    .tagline h1 {
+      font-size:clamp(28px, 4vw, 42px);
+      font-weight:600; line-height:1.2;
+      letter-spacing:-1px;
+    }
+    .tagline h1 span { color:var(--accent); }
+    .tagline p { color:var(--muted); font-size:15px; margin-top:10px; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display:flex; gap:0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius:16px; padding:6px;
+      margin-bottom:32px;
+      width:fit-content; margin:0 auto 36px;
+    }
+    .tab-btn {
+      font-family:var(--sans); font-size:14px; font-weight:500;
+      padding:10px 28px; border-radius:12px; border:none; cursor:pointer;
+      background:transparent; color:var(--muted);
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, rgba(0,229,255,0.15), rgba(0,229,255,0.05));
+      color:var(--accent);
+      border: 1px solid rgba(0,229,255,0.25);
+    }
+    .tab-btn:hover:not(.active) { color:var(--text); }
+
+    /* ── Panels ── */
+    .panel { display:none; animation: fadeUp 0.35s ease; }
+    .panel.active { display:block; }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(16px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius:20px;
+      padding:32px;
+    }
+    .card-title {
+      font-family:var(--mono);
+      font-size:12px; letter-spacing:2px; text-transform:uppercase;
+      color:var(--muted); margin-bottom:24px;
+      display:flex; align-items:center; gap:8px;
+    }
+    .card-title::before {
+      content:''; display:block;
+      width:16px; height:2px;
+      background: var(--accent);
+    }
+
+    /* ── Form Grid ── */
+    .form-grid {
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap:16px;
+    }
+    .form-group { display:flex; flex-direction:column; gap:6px; }
+    .form-group label {
+      font-size:11px; letter-spacing:1.5px; text-transform:uppercase;
+      color:var(--muted); font-family:var(--mono);
+    }
+    .form-group input, .form-group select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius:10px;
+      color:var(--text); font-family:var(--sans); font-size:14px;
+      padding:10px 14px;
+      outline:none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: rgba(0,229,255,0.5);
+      box-shadow: 0 0 0 3px rgba(0,229,255,0.07);
+    }
+    .form-group select option { background: var(--card); }
+
+    /* ── Divider ── */
+    .section-divider {
+      display:flex; align-items:center; gap:12px;
+      margin:28px 0 20px;
+    }
+    .section-divider span {
+      font-size:11px; letter-spacing:2px; text-transform:uppercase;
+      color:var(--muted); white-space:nowrap;
+    }
+    .section-divider::before,.section-divider::after {
+      content:''; flex:1; height:1px; background:var(--border);
+    }
+
+    /* ── Submit Button ── */
+    .btn-primary {
+      margin-top:28px;
+      width:100%;
+      padding:14px;
+      background: linear-gradient(135deg, var(--accent), #0099bb);
+      color: #060b14; font-family:var(--mono);
+      font-size:13px; font-weight:700; letter-spacing:1.5px;
+      border:none; border-radius:12px; cursor:pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      text-transform:uppercase;
+    }
+    .btn-primary:hover {
+      transform:translateY(-1px);
+      box-shadow: 0 8px 24px rgba(0,229,255,0.25);
+    }
+    .btn-primary:active { transform:translateY(0); }
+    .btn-primary:disabled { opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
+
+    /* ── Result Box ── */
+    .result-box {
+      margin-top:28px;
+      background: var(--surface);
+      border-radius:16px;
+      border: 1px solid var(--border);
+      overflow:hidden;
+      display:none;
+    }
+    .result-box.visible { display:block; animation: fadeUp 0.35s ease; }
+
+    .result-header {
+      padding:20px 24px;
+      display:flex; align-items:center; gap:14px;
+    }
+    .risk-badge {
+      font-family:var(--mono); font-size:11px; letter-spacing:1.5px;
+      padding:4px 12px; border-radius:20px; text-transform:uppercase;
+    }
+    .risk-low    { background:rgba(0,245,160,0.12); color:var(--green); border:1px solid rgba(0,245,160,0.25); }
+    .risk-medium { background:rgba(255,181,71,0.12); color:var(--amber); border:1px solid rgba(255,181,71,0.25); }
+    .risk-high   { background:rgba(255,61,113,0.12); color:var(--accent2); border:1px solid rgba(255,61,113,0.25); }
+
+    .result-title { font-size:17px; font-weight:600; }
+    .result-sub   { font-size:13px; color:var(--muted); margin-top:3px; }
+
+    .result-body { padding:0 24px 24px; }
+    .prob-bar-wrap {
+      margin:12px 0 20px;
+    }
+    .prob-label {
+      display:flex; justify-content:space-between;
+      font-size:11px; color:var(--muted); margin-bottom:6px;
+    }
+    .prob-bar-bg {
+      height:8px; border-radius:4px;
+      background:rgba(255,255,255,0.06);
+      overflow:hidden;
+    }
+    .prob-bar-fill {
+      height:100%; border-radius:4px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 1s cubic-bezier(0.4,0,0.2,1);
+      width:0;
+    }
+
+    .top-factors { margin-top:16px; }
+    .top-factors h4 { font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:10px; font-family:var(--mono); }
+    .factor-row {
+      display:flex; align-items:center; gap:10px;
+      padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+    }
+    .factor-name { font-size:13px; color:var(--text); flex:1; }
+    .factor-chip {
+      font-family:var(--mono); font-size:11px; padding:2px 8px;
+      border-radius:4px;
+    }
+    .factor-chip.pos { background:rgba(255,61,113,0.1); color:var(--accent2); }
+    .factor-chip.neg { background:rgba(0,245,160,0.1); color:var(--green); }
+
+    .shap-img { width:100%; border-radius:12px; margin-top:20px; }
+
+    /* ── ECG Upload Zone ── */
+    .ecg-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+    @media(max-width:680px) { .ecg-grid { grid-template-columns:1fr; } }
+
+    .upload-zone {
+      border:2px dashed var(--border);
+      border-radius:16px;
+      padding:48px 24px;
+      text-align:center;
+      cursor:pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position:relative;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color:rgba(0,229,255,0.5);
+      background:rgba(0,229,255,0.03);
+    }
+    .upload-icon { font-size:40px; margin-bottom:12px; }
+    .upload-title { font-size:15px; font-weight:500; margin-bottom:6px; }
+    .upload-hint  { font-size:12px; color:var(--muted); }
+    #ecg-file-input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+
+    .ecg-preview-img {
+      width:100%; border-radius:12px;
+      border:1px solid var(--border);
+      display:none; margin-top:12px;
+    }
+    .file-selected { display:none; }
+    .file-selected.visible {
+      display:flex; align-items:center; gap:10px;
+      background:rgba(0,229,255,0.06);
+      border:1px solid rgba(0,229,255,0.2);
+      border-radius:10px; padding:10px 14px;
+      margin-top:12px; font-size:13px;
+    }
+
+    .ecg-result-panel {
+      display:none;
+      flex-direction:column; gap:16px;
+    }
+    .ecg-result-panel.visible { display:flex; animation:fadeUp 0.3s ease; }
+
+    .ecg-diagnosis {
+      background: var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:20px;
+    }
+    .ecg-diagnosis .label { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); font-family:var(--mono); margin-bottom:8px; }
+    .ecg-diagnosis .value { font-size:22px; font-weight:600; }
+    .ecg-diagnosis .desc { font-size:13px; color:var(--muted); margin-top:8px; line-height:1.6; }
+
+    .conf-row {
+      display:flex; align-items:center; gap:12px; margin-top:12px;
+    }
+    .conf-label { font-size:12px; color:var(--muted); width:90px; }
+    .conf-bar-bg { flex:1; height:6px; border-radius:3px; background:rgba(255,255,255,0.06); overflow:hidden; }
+    .conf-bar-fill { height:100%; border-radius:3px; background:var(--accent); transition:width 1s ease; width:0; }
+    .conf-pct { font-family:var(--mono); font-size:12px; color:var(--accent); width:40px; text-align:right; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display:none;
+      width:20px; height:20px;
+      border:2px solid rgba(0,229,255,0.2);
+      border-top-color:var(--accent);
+      border-radius:50%;
+      animation: spin 0.7s linear infinite;
+      margin:0 auto;
+    }
+    .spinner.active { display:inline-block; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── Disclaimer ── */
+    .disclaimer {
+      margin-top:40px;
+      background:rgba(255,181,71,0.05);
+      border:1px solid rgba(255,181,71,0.15);
+      border-radius:12px;
+      padding:16px 20px;
+      display:flex; gap:12px; align-items:flex-start;
+    }
+    .disclaimer-icon { font-size:16px; margin-top:1px; }
+    .disclaimer p { font-size:12px; color:#a08040; line-height:1.6; }
+
+    /* ── ECG leads chart ── */
+    .ecg-leads-chart { width:100%; border-radius:12px; margin-top:12px; }
+
+    /* ── Responsive ── */
+    @media(max-width:600px) {
+      .form-grid { grid-template-columns:1fr 1fr; }
+      header { flex-wrap:wrap; }
+      .badge { margin-left:0; margin-top:8px; }
+    }
+  </style>
+</head>
+<body>
+<div class="glow-orb one"></div>
+<div class="glow-orb two"></div>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-icon">❤️</div>
+    <div>
+      <div class="logo-text">CardiXAI</div>
+      <div class="logo-sub">Explainable Heart Risk Intelligence</div>
+    </div>
+    <div class="badge">XAI · SHAP · ECG</div>
+  </header>
+
+  <!-- Tagline -->
+  <div class="tagline">
+    <h1>Predict <span>Coronary Artery Disease</span><br/>with Explainable AI</h1>
+    <p>Manual clinical data entry · ECG image scan · SHAP feature attribution</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('cad')">🫀 CAD Prediction</button>
+    <button class="tab-btn" onclick="switchTab('ecg')">📈 ECG Scan</button>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       CAD PREDICTION PANEL
+  ══════════════════════════════════════ -->
+  <div class="panel active" id="panel-cad">
+    <div class="card">
+      <div class="card-title">Patient Clinical Parameters</div>
+
+      <div class="form-grid">
+        <!-- Demographics -->
+        <div class="form-group">
+          <label>Age (years)</label>
+          <input type="number" id="age" placeholder="e.g. 52" min="20" max="100"/>
+        </div>
+        <div class="form-group">
+          <label>Sex</label>
+          <select id="male">
+            <option value="1">Male</option>
+            <option value="0">Female</option>
+          </select>
+        </div>
+
+        <div class="section-divider" style="grid-column:1/-1;"><span>Smoking</span></div>
+
+        <div class="form-group">
+          <label>Current Smoker</label>
+          <select id="currentSmoker">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Cigarettes / Day</label>
+          <input type="number" id="cigsPerDay" placeholder="e.g. 10" min="0" max="80"/>
+        </div>
+
+        <div class="section-divider" style="grid-column:1/-1;"><span>Medical History</span></div>
+
+        <div class="form-group">
+          <label>BP Medication</label>
+          <select id="BPMeds">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Prevalent Stroke</label>
+          <select id="prevalentStroke">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Hypertension</label>
+          <select id="prevalentHyp">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Diabetes</label>
+          <select id="diabetes">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+
+        <div class="section-divider" style="grid-column:1/-1;"><span>Vitals & Labs</span></div>
+
+        <div class="form-group">
+          <label>Total Cholesterol (mg/dL)</label>
+          <input type="number" id="totChol" placeholder="e.g. 200" min="100" max="600"/>
+        </div>
+        <div class="form-group">
+          <label>Systolic BP (mmHg)</label>
+          <input type="number" id="sysBP" placeholder="e.g. 120" min="80" max="300"/>
+        </div>
+        <div class="form-group">
+          <label>Diastolic BP (mmHg)</label>
+          <input type="number" id="diaBP" placeholder="e.g. 80" min="40" max="200"/>
+        </div>
+        <div class="form-group">
+          <label>BMI (kg/m²)</label>
+          <input type="number" id="BMI" placeholder="e.g. 25.0" step="0.1" min="10" max="60"/>
+        </div>
+        <div class="form-group">
+          <label>Heart Rate (bpm)</label>
+          <input type="number" id="heartRate" placeholder="e.g. 72" min="30" max="200"/>
+        </div>
+        <div class="form-group">
+          <label>Glucose (mg/dL)</label>
+          <input type="number" id="glucose" placeholder="e.g. 85" min="40" max="500"/>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="cad-btn" onclick="predictCAD()">
+        <span id="cad-btn-text">⚡ ANALYSE RISK</span>
+        <span class="spinner" id="cad-spinner"></span>
+      </button>
+    </div>
+
+    <!-- Result -->
+    <div class="result-box" id="cad-result">
+      <div class="result-header">
+        <div>
+          <div id="result-badge" class="risk-badge risk-low">LOW RISK</div>
+        </div>
+        <div>
+          <div class="result-title" id="result-title">Low Risk of CAD</div>
+          <div class="result-sub" id="result-sub">Based on your clinical parameters</div>
+        </div>
+      </div>
+      <div class="result-body">
+        <div class="prob-bar-wrap">
+          <div class="prob-label">
+            <span>10-Year CAD Risk Probability</span>
+            <span id="prob-pct">0%</span>
+          </div>
+          <div class="prob-bar-bg"><div class="prob-bar-fill" id="prob-bar"></div></div>
+        </div>
+
+        <div class="top-factors">
+          <h4>Top Contributing Factors</h4>
+          <div id="factors-list"></div>
+        </div>
+
+        <img class="shap-img" id="shap-chart" alt="SHAP Feature Importance"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       ECG SCAN PANEL
+  ══════════════════════════════════════ -->
+  <div class="panel" id="panel-ecg">
+    <div class="card">
+      <div class="card-title">ECG Image Analysis</div>
+
+      <div class="ecg-grid">
+        <!-- Left: Upload -->
+        <div>
+          <div class="upload-zone" id="upload-zone">
+            <input type="file" id="ecg-file-input" accept="image/*" onchange="handleFileSelect(event)"/>
+            <div class="upload-icon">🩺</div>
+            <div class="upload-title">Drop ECG Image Here</div>
+            <div class="upload-hint">Supports PNG, JPG — standard 12-lead ECG format</div>
+          </div>
+          <div class="file-selected" id="file-selected">
+            <span>📄</span>
+            <span id="file-name">No file</span>
+          </div>
+
+          <button class="btn-primary" id="ecg-btn" onclick="predictECG()" style="margin-top:16px;" disabled>
+            <span id="ecg-btn-text">🔬 SCAN ECG</span>
+            <span class="spinner" id="ecg-spinner"></span>
+          </button>
+        </div>
+
+        <!-- Right: Result -->
+        <div class="ecg-result-panel" id="ecg-result-panel">
+          <div class="ecg-diagnosis">
+            <div class="label">ECG Classification</div>
+            <div class="value" id="ecg-label">—</div>
+            <div class="risk-badge" id="ecg-risk-badge" style="display:inline-block;margin-top:10px;">—</div>
+            <div class="desc" id="ecg-desc">—</div>
+            <div class="conf-row">
+              <div class="conf-label">Confidence</div>
+              <div class="conf-bar-bg"><div class="conf-bar-fill" id="conf-bar"></div></div>
+              <div class="conf-pct" id="conf-pct">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ECG leads chart (full width) -->
+      <img class="ecg-leads-chart" id="ecg-leads-chart" alt="ECG Leads" style="display:none;"/>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer">
+    <div class="disclaimer-icon">⚠️</div>
+    <p><strong>Medical Disclaimer:</strong> This tool is for educational and research purposes only.
+       Predictions are based on the Framingham Heart Study dataset and should <em>not</em> replace
+       professional medical advice, diagnosis, or treatment. Always consult a qualified physician
+       for clinical decisions.</p>
+  </div>
+
+</div>
+
+<!-- ── Scripts ─────────────────────────────────────────────────────────────── -->
+<script>
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0 && tab==='cad')||(i===1 && tab==='ecg')));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-'+tab).classList.add('active');
+  }
+
+  // ── CAD Prediction ──────────────────────────────────────────────────────────
+  async function predictCAD() {
+    const fields = ['age','male','currentSmoker','cigsPerDay','BPMeds','prevalentStroke',
+                    'prevalentHyp','diabetes','totChol','sysBP','diaBP','BMI','heartRate','glucose'];
+
+    const data = {};
+    for (const f of fields) {
+      const el = document.getElementById(f);
+      const v = el.value.trim();
+      if (v === '') { el.style.borderColor='var(--accent2)'; el.focus(); return; }
+      el.style.borderColor='';
+      data[f] = parseFloat(v);
+    }
+
+    const btn = document.getElementById('cad-btn');
+    const txt = document.getElementById('cad-btn-text');
+    const spin = document.getElementById('cad-spinner');
+    btn.disabled=true; txt.style.display='none'; spin.classList.add('active');
+
+    try {
+      const res = await fetch('/predict_cad', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(data)
+      });
+      const json = await res.json();
+      if (json.error) { alert('Error: '+json.error); return; }
+      renderCADResult(json);
+    } catch(e) {
+      alert('Server error: '+e);
+    } finally {
+      btn.disabled=false; txt.style.display='inline'; spin.classList.remove('active');
+    }
+  }
+
+  function renderCADResult(r) {
+    const box = document.getElementById('cad-result');
+    box.classList.add('visible');
+
+    const badge = document.getElementById('result-badge');
+    badge.className = 'risk-badge risk-'+r.risk_level;
+    badge.textContent = r.risk_level.toUpperCase()+' RISK';
+
+    document.getElementById('result-title').textContent = r.message;
+    document.getElementById('result-sub').textContent = `10-year CHD probability: ${r.risk_pct}%`;
+    document.getElementById('prob-pct').textContent = r.risk_pct+'%';
+
+    setTimeout(() => {
+      document.getElementById('prob-bar').style.width = Math.min(r.risk_pct, 100)+'%';
+    }, 100);
+
+    const list = document.getElementById('factors-list');
+    list.innerHTML = '';
+    r.top_factors.forEach(([name, val]) => {
+      const pos = val > 0;
+      list.innerHTML += `
+        <div class="factor-row">
+          <span class="factor-name">${name}</span>
+          <span class="factor-chip ${pos?'pos':'neg'}">${pos?'↑ Risk':'↓ Risk'}</span>
+        </div>`;
+    });
+
+    if (r.shap_chart) {
+      const img = document.getElementById('shap-chart');
+      img.src = 'data:image/png;base64,'+r.shap_chart;
+      img.style.display='block';
+    }
+
+    box.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  // ── ECG Scan ────────────────────────────────────────────────────────────────
+  let selectedFile = null;
+
+  function handleFileSelect(e) {
+    selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+    document.getElementById('file-name').textContent = selectedFile.name;
+    document.getElementById('file-selected').classList.add('visible');
+    document.getElementById('ecg-btn').disabled = false;
+
+    // Show image preview in upload zone
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const zone = document.getElementById('upload-zone');
+      zone.style.backgroundImage = `url(${ev.target.result})`;
+      zone.style.backgroundSize = 'cover';
+      zone.style.backgroundPosition = 'center';
+      zone.querySelector('.upload-icon').style.display='none';
+      zone.querySelector('.upload-title').style.display='none';
+      zone.querySelector('.upload-hint').style.display='none';
+    };
+    reader.readAsDataURL(selectedFile);
+  }
+
+  // Drag and drop
+  const zone = document.getElementById('upload-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) {
+      selectedFile = f;
+      document.getElementById('file-name').textContent = f.name;
+      document.getElementById('file-selected').classList.add('visible');
+      document.getElementById('ecg-btn').disabled = false;
+    }
+  });
+
+  async function predictECG() {
+    if (!selectedFile) return;
+    const btn = document.getElementById('ecg-btn');
+    const txt = document.getElementById('ecg-btn-text');
+    const spin = document.getElementById('ecg-spinner');
+    btn.disabled=true; txt.style.display='none'; spin.classList.add('active');
+
+    const fd = new FormData();
+    fd.append('file', selectedFile);
+
+    try {
+      const res = await fetch('/predict_ecg', { method:'POST', body:fd });
+      const json = await res.json();
+      if (json.error) { alert('Error: '+json.error); return; }
+      renderECGResult(json);
+    } catch(e) {
+      alert('Server error: '+e);
+    } finally {
+      btn.disabled=false; txt.style.display='inline'; spin.classList.remove('active');
+    }
+  }
+
+  function renderECGResult(r) {
+    const panel = document.getElementById('ecg-result-panel');
+    panel.classList.add('visible');
+
+    document.getElementById('ecg-label').textContent = r.label;
+    document.getElementById('ecg-desc').textContent = r.description;
+
+    const badge = document.getElementById('ecg-risk-badge');
+    badge.className = 'risk-badge risk-'+r.risk;
+    badge.textContent = r.risk.toUpperCase()+' RISK';
+
+    document.getElementById('conf-pct').textContent = r.confidence+'%';
+    setTimeout(() => {
+      document.getElementById('conf-bar').style.width = r.confidence+'%';
+    }, 100);
+
+    if (r.preview) {
+      const img = document.getElementById('ecg-leads-chart');
+      img.src = 'data:image/png;base64,'+r.preview;
+      img.style.display='block';
+    }
+  }
+</script>
+</body>
+</html>
